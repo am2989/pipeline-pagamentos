@@ -406,6 +406,7 @@ Algumas evoluções possíveis incluem:
 Este projeto foi desenvolvido como exercício prático para explorar conceitos de integração de dados, replicação lógica e arquiteturas orientadas a eventos.
 
 A implementação permitiu experimentar a comunicação entre diferentes tecnologias, compreender o funcionamento do Change Data Capture e observar como as alterações efetuadas numa base de dados podem ser transmitidas para uma plataforma de streaming.
+
 ## Limitações e adaptações do projeto
 
 ### Ambiente de execução
@@ -422,7 +423,10 @@ A solução local demonstra a captura e transmissão de alterações de dados en
 
 As componentes previstas no desafio que dependem de serviços adicionais, nomeadamente Confluent Cloud, Schema Registry e Apache Flink SQL, não estão implementadas nesta versão.
 
-A deteção de padrões de fraude, através da identificação de três transações associadas ao mesmo cartão num intervalo de 60 segundos, permanece como funcionalidade por implementar.
+A deteção local de padrões de fraude está implementada no consumidor Python:
+ele identifica três inserções associadas ao mesmo cartão numa janela de 60
+segundos. O estado dessa janela permanece em memória e não constitui um sistema
+de prevenção de fraude para produção.
 
 Esta adaptação permitiu desenvolver e validar os fundamentos da arquitetura de streaming de dados sem assumir custos de infraestrutura cloud.
 
@@ -431,7 +435,7 @@ Esta adaptação permitiu desenvolver e validar os fundamentos da arquitetura de
 - Integração com Confluent Cloud.
 - Implementação do Schema Registry e respetivo contrato de dados.
 - Processamento de eventos com Apache Flink SQL.
-- Implementação da regra de deteção de fraude em tempo real.
+- Persistência do estado de deteção entre reinícios do consumidor.
 - Configuração de alertas e métricas operacionais.
 - Documentação dos controlos de acesso e estimativa de custos.
 
