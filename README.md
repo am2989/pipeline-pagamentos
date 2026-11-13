@@ -72,6 +72,10 @@ pipeline-pagamentos/
 ├── .env.example
 ├── README.md
 ├── docker-compose.yml
+├── consumer/
+│   ├── consumer.py
+│   ├── requirements.txt
+│   └── README.md
 ├── evidencias/
 │   ├── insert_payment_9999.json
 │   ├── update_payment_3.json
@@ -303,6 +307,13 @@ Os eventos incluem informação sobre os dados anteriores (`before`) e posterior
 
 No caso de uma eliminação, o campo `after` apresenta valor `null`.
 
+## Consumidor Python
+
+O consumidor em `consumer/` lê eventos de inserção do tópico de pagamentos e
+gera um alerta quando identifica pelo menos três transações do mesmo cartão
+numa janela de 60 segundos. Os números de cartão não são apresentados; consulte
+[`consumer/README.md`](consumer/README.md) para instalação e configuração.
+
 ## 11. REPLICA IDENTITY FULL
 
 Por defeito, o PostgreSQL pode disponibilizar apenas a chave primária no evento de eliminação, dependendo da configuração de identidade da réplica.
@@ -384,7 +395,6 @@ A arquitetura atual constitui uma base para futuras experiências na área de En
 Algumas evoluções possíveis incluem:
 
 - Automatizar o registo do conector Debezium através de um ficheiro de configuração.
-- Implementar consumidores Kafka para processar os eventos.
 - Integrar Apache Flink para processamento de dados em fluxo.
 - Desenvolver mecanismos de validação e transformação dos eventos.
 - Implementar monitorização dos serviços e da pipeline.
