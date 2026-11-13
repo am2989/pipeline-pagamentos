@@ -1,0 +1,19 @@
+{
+  "op": "u",
+  "before": {
+    "payment_id": 3,
+    "account_id": 1,
+    "amount": "EZQ=",
+    "currency": "EUR",
+    "status": "APPROVED",
+    "created_at": 1794587235860503
+  },
+  "after": {
+    "payment_id": 3,
+    "account_id": 1,
+    "amount": "EZQ=",
+    "currency": "EUR",
+    "status": "PENDING",
+    "created_at": 1794587235860503
+  }
+}

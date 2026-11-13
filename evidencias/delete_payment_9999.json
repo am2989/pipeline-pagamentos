@@ -1,0 +1,12 @@
+{
+  "op": "d",
+  "before": {
+    "payment_id": 9999,
+    "account_id": 999,
+    "amount": "BOI=",
+    "currency": "EUR",
+    "status": "PENDING",
+    "created_at": 1794594241599494
+  },
+  "after": {}
+}

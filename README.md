@@ -8,7 +8,7 @@ O projeto demonstra como implementar replicação lógica, capturar operações 
 
 ## 1. Visão geral do projeto
 
-Esta pipeline permite acompanhar as alterações efetuadas na tabela `public.payments`, armazenada no PostgreSQL, e transmitir os respetivos eventos para o Apache Kafka através do Debezium.
+Esta pipeline permite acompanhar as alterações efetuadas nas tabelas `public.accounts` e `public.payments`, armazenadas no PostgreSQL, e transmitir os respetivos eventos para o Apache Kafka através do Debezium.
 
 O objetivo é demonstrar o funcionamento de uma arquitetura de integração de dados baseada em CDC, permitindo identificar e acompanhar as alterações realizadas numa base de dados sem recorrer a consultas periódicas para detetar diferenças.
 
@@ -30,33 +30,12 @@ A arquitetura utiliza PostgreSQL como origem dos dados, Debezium como ferramenta
 ### Fluxo de dados
 
 ```text
-┌──────────────────────────┐
-│       PostgreSQL 16      │
-│                          │
-│      payments_db         │
-│      payments            │
-└────────────┬─────────────┘
-             │
-             ▼
-┌──────────────────────────┐
-│     Logical Replication  │
-│         WAL / pgoutput   │
-└────────────┬─────────────┘
-             │
-             ▼
-┌──────────────────────────┐
-│        Debezium          │
-│   PostgreSQL Connector   │
-│                          │
-│       Kafka Connect      │
-└────────────┬─────────────┘
-             │
-             ▼
-┌──────────────────────────┐
-│      Apache Kafka        │
-│                          │
-│ dbserver1.public.payments│
-└──────────────────────────┘
+PostgreSQL 16 (payments_db)
+  └─ replicação lógica (WAL / pgoutput)
+       └─ conector PostgreSQL do Debezium
+            └─ Apache Kafka
+                 ├─ dbserver1.public.accounts
+                 └─ dbserver1.public.payments
 ```
 
 Os serviços são executados em containers Docker e comunicam entre si através da rede criada pelo Docker Compose.
@@ -93,6 +72,10 @@ pipeline-pagamentos/
 ├── .env.example
 ├── README.md
 ├── docker-compose.yml
+├── evidencias/
+│   ├── insert_payment_9999.json
+│   ├── update_payment_3.json
+│   └── delete_payment_9999.json
 │
 └── postgres/
     └── init.sql
@@ -200,7 +183,7 @@ Esta configuração permite disponibilizar a imagem completa do registo anterior
 
 ## 8. Configuração do conector Debezium
 
-O conector PostgreSQL do Debezium é responsável por monitorizar as alterações na tabela `public.payments`.
+O conector PostgreSQL do Debezium é responsável por monitorizar as alterações nas tabelas `public.accounts` e `public.payments`.
 
 A configuração utiliza:
 
@@ -210,7 +193,7 @@ A configuração utiliza:
 | Classe | `PostgresConnector` |
 | Base de dados | `payments_db` |
 | Utilizador | `payments` |
-| Tabela monitorizada | `public.payments` |
+| Tabelas monitorizadas | `public.accounts`, `public.payments` |
 | Plugin | `pgoutput` |
 | Replication Slot | `payments_slot` |
 | Publication | `payments_publication` |
@@ -238,7 +221,7 @@ curl --fail-with-body -X POST \
       "database.dbname": "payments_db",
       "topic.prefix": "dbserver1",
       "plugin.name": "pgoutput",
-      "table.include.list": "public.payments",
+      "table.include.list": "public.accounts,public.payments",
       "slot.name": "payments_slot",
       "publication.name": "payments_publication",
       "publication.autocreate.mode": "filtered",
@@ -264,18 +247,20 @@ RUNNING
 
 ## 9. Tópicos Kafka
 
-O Debezium publica os eventos de alteração no tópico:
+O Debezium publica os eventos de alteração nos tópicos:
 
 ```text
+dbserver1.public.accounts
 dbserver1.public.payments
 ```
 
-Este nome resulta da combinação do prefixo `dbserver1` com o esquema e a tabela monitorizada.
+Os nomes resultam da combinação do prefixo `dbserver1` com o esquema e cada tabela monitorizada.
 
 O Kafka Connect também utiliza tópicos internos para armazenar configurações, offsets e estados.
 
 | Tópico | Finalidade |
 |---|---|
+| `dbserver1.public.accounts` | Eventos CDC da tabela de contas |
 | `dbserver1.public.payments` | Eventos CDC da tabela de pagamentos |
 | `connect_configs` | Configurações dos conectores |
 | `connect_offsets` | Posições de leitura e offsets |
@@ -351,8 +336,9 @@ A validação funcional da pipeline foi realizada num ambiente local com Docker 
 | Debezium Connect em execução | Confirmado |
 | Registo do conector | Concluído |
 | Estado do conector | RUNNING |
-| Captura inicial (Snapshot) | Confirmada |
-| Evento INSERT | Confirmado |
+| Captura inicial de pagamentos (Snapshot) | Confirmada |
+| Evento INSERT em `public.accounts` | Confirmado |
+| Evento INSERT em `public.payments` | Confirmado |
 | Evento UPDATE | Confirmado |
 | Evento DELETE | Confirmado |
 | Imagem anterior completa (`before`) | Confirmada |
@@ -361,7 +347,7 @@ A validação funcional da pipeline foi realizada num ambiente local com Docker 
 
 Foi criado um pagamento sintético para testar as operações de inserção, atualização e eliminação.
 
-Os eventos foram observados no tópico:
+Os eventos de pagamentos foram observados no tópico:
 
 ```text
 dbserver1.public.payments
@@ -370,6 +356,8 @@ dbserver1.public.payments
 Foi igualmente confirmado que os eventos UPDATE e DELETE disponibilizavam as sete colunas do registo anterior.
 
 Após os testes, o registo utilizado foi eliminado e os cinco pagamentos originais de demonstração permaneceram na base de dados.
+
+As evidências dos eventos de inserção, atualização e eliminação de pagamentos estão guardadas em `evidencias/`.
 
 ## 13. Segurança e boas práticas
 
