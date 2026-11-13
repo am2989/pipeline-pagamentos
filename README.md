@@ -396,6 +396,34 @@ Algumas evoluções possíveis incluem:
 Este projeto foi desenvolvido como exercício prático para explorar conceitos de integração de dados, replicação lógica e arquiteturas orientadas a eventos.
 
 A implementação permitiu experimentar a comunicação entre diferentes tecnologias, compreender o funcionamento do Change Data Capture e observar como as alterações efetuadas numa base de dados podem ser transmitidas para uma plataforma de streaming.
+## Limitações e adaptações do projeto
+
+### Ambiente de execução
+
+O projeto foi desenvolvido e testado num ambiente local, utilizando Docker Compose, PostgreSQL, Apache Kafka e Debezium.
+
+A integração com o Confluent Cloud não foi realizada devido à necessidade de disponibilizar um método de pagamento para provisionar recursos na plataforma, algo que não estava disponível no âmbito deste projeto académico.
+
+Por esse motivo, foi adotada uma implementação local com tecnologias open source, permitindo demonstrar e validar o funcionamento do Change Data Capture (CDC), incluindo a captura de operações INSERT, UPDATE e DELETE.
+
+### Âmbito da implementação
+
+A solução local demonstra a captura e transmissão de alterações de dados entre PostgreSQL, Debezium e Kafka.
+
+As componentes previstas no desafio que dependem de serviços adicionais, nomeadamente Confluent Cloud, Schema Registry e Apache Flink SQL, não estão implementadas nesta versão.
+
+A deteção de padrões de fraude, através da identificação de três transações associadas ao mesmo cartão num intervalo de 60 segundos, permanece como funcionalidade por implementar.
+
+Esta adaptação permitiu desenvolver e validar os fundamentos da arquitetura de streaming de dados sem assumir custos de infraestrutura cloud.
+
+### Trabalho futuro
+
+- Integração com Confluent Cloud.
+- Implementação do Schema Registry e respetivo contrato de dados.
+- Processamento de eventos com Apache Flink SQL.
+- Implementação da regra de deteção de fraude em tempo real.
+- Configuração de alertas e métricas operacionais.
+- Documentação dos controlos de acesso e estimativa de custos.
 
 ---
 
