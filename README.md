@@ -1,111 +1,228 @@
-# Payments CDC Pipeline
+# Pipeline de Pagamentos — Change Data Capture (CDC)
 
-A local, containerized change data capture (CDC) demo that streams changes from
-PostgreSQL to Kafka with Debezium.
+Uma demonstração local de uma pipeline de **Change Data Capture (CDC)** que captura alterações numa base de dados PostgreSQL e as transmite em tempo real para Apache Kafka, utilizando Debezium.
 
-## Project overview
+O projeto demonstra como implementar replicação lógica, capturar operações de inserção, atualização e eliminação de registos e disponibilizar esses eventos para consumo através de tópicos Kafka.
 
-The pipeline captures changes to `public.payments` and publishes Debezium events
-to Kafka. It demonstrates an initial snapshot and the CDC operations for
-inserting, updating, and deleting a payment.
+---
 
-This project is intended for local development and demonstration, not production
-use.
+## 1. Visão geral do projeto
 
-## Architecture
+Esta pipeline permite acompanhar as alterações efetuadas na tabela `public.payments`, armazenada no PostgreSQL, e transmitir os respetivos eventos para o Apache Kafka através do Debezium.
+
+O objetivo é demonstrar o funcionamento de uma arquitetura de integração de dados baseada em CDC, permitindo identificar e acompanhar as alterações realizadas numa base de dados sem recorrer a consultas periódicas para detetar diferenças.
+
+A implementação contempla:
+
+- Captura inicial dos registos existentes (snapshot).
+- Deteção de novas inserções (INSERT).
+- Deteção de atualizações (UPDATE).
+- Deteção de eliminações (DELETE).
+- Publicação dos eventos no Apache Kafka.
+- Monitorização do estado do conector Debezium.
+
+Este projeto foi desenvolvido para fins de aprendizagem, experimentação e demonstração técnica. Não se destina a utilização em ambientes de produção.
+
+## 2. Arquitetura da solução
+
+A arquitetura utiliza PostgreSQL como origem dos dados, Debezium como ferramenta de captura de alterações e Apache Kafka como plataforma de transmissão dos eventos.
+
+### Fluxo de dados
 
 ```text
-PostgreSQL 16
-  └─ logical WAL / pgoutput
-       └─ Debezium PostgreSQL connector
-            └─ Kafka topic: dbserver1.public.payments
+┌──────────────────────────┐
+│       PostgreSQL 16      │
+│                          │
+│      payments_db         │
+│      payments            │
+└────────────┬─────────────┘
+             │
+             ▼
+┌──────────────────────────┐
+│     Logical Replication  │
+│         WAL / pgoutput   │
+└────────────┬─────────────┘
+             │
+             ▼
+┌──────────────────────────┐
+│        Debezium          │
+│   PostgreSQL Connector   │
+│                          │
+│       Kafka Connect      │
+└────────────┬─────────────┘
+             │
+             ▼
+┌──────────────────────────┐
+│      Apache Kafka        │
+│                          │
+│ dbserver1.public.payments│
+└──────────────────────────┘
 ```
 
-Docker Compose runs PostgreSQL, a single-node Kafka broker/controller, and
-Debezium Connect. Kafka and Debezium communicate over the Compose network.
+Os serviços são executados em containers Docker e comunicam entre si através da rede criada pelo Docker Compose.
 
-## Technologies
+### Componentes principais
 
-- Docker Compose
+| Componente | Função |
+|---|---|
+| PostgreSQL 16 | Armazenamento dos dados de pagamentos |
+| Logical Replication | Disponibilização das alterações através do WAL |
+| Debezium | Captura das alterações na base de dados |
+| Kafka Connect | Execução e gestão do conector Debezium |
+| Apache Kafka 3.9.1 | Armazenamento e distribuição dos eventos |
+| Docker Compose | Orquestração dos serviços |
+
+## 3. Tecnologias utilizadas
+
+- Docker e Docker Compose
 - PostgreSQL 16
-- Apache Kafka 3.9.1 (KRaft, single node)
-- Debezium Connect (`quay.io/debezium/connect:3.0`)
-- Kafka Connect JSON converters
+- Apache Kafka 3.9.1
+- Kafka em modo KRaft
+- Debezium Connect 3.0
+- Kafka Connect REST API
+- PostgreSQL Logical Replication
+- Plugin `pgoutput`
+- JSON Converters
 
-## Repository layout
+## 4. Estrutura do repositório
 
 ```text
-.
+pipeline-pagamentos/
+│
 ├── .gitignore
 ├── .env.example
 ├── README.md
 ├── docker-compose.yml
-├── postgres/
-│   └── init.sql
-├── debezium/   # currently empty
-├── kafka/      # currently empty
-├── flink/      # currently empty
-├── schemas/    # currently empty
-└── evidence/   # currently empty
+│
+└── postgres/
+    └── init.sql
 ```
 
-The connector configuration is currently registered in the running Kafka
-Connect instance; it is not stored in a project file.
+A configuração do conector Debezium é atualmente registada através da API REST do Kafka Connect, não estando ainda armazenada num ficheiro independente no repositório.
 
-## Docker setup
+As futuras extensões poderão incluir diretórios dedicados a configurações Debezium, Kafka, Flink e esquemas de dados.
 
-From the project directory, start the services:
+## 5. Pré-requisitos
+
+Antes de executar o projeto, é necessário ter instalado:
+
+- Docker Desktop ou Docker Engine.
+- Docker Compose.
+- Git.
+- Um terminal com acesso aos comandos Docker.
+- `curl` para testar a API REST do Kafka Connect.
+
+## 6. Instalação e configuração
+
+### 6.1. Clonar o repositório
 
 ```bash
-[ -f .env ] || cp .env.example .env
+git clone https://github.com/am2989/pipeline-pagamentos.git
+
+cd pipeline-pagamentos
 ```
 
-If you created `.env` from the template, replace its placeholder with a local
-development password before continuing. Then validate and start the services:
+### 6.2. Configurar as variáveis de ambiente
+
+Criar o ficheiro local `.env` a partir do modelo disponibilizado:
+
+```bash
+cp .env.example .env
+```
+
+Editar o ficheiro `.env` e substituir o valor de exemplo da variável `POSTGRES_PASSWORD` por uma password local de desenvolvimento.
+
+**Importante:** o ficheiro `.env` está excluído pelo `.gitignore` e não deve ser publicado no GitHub.
+
+O ficheiro `.env.example` contém apenas um valor ilustrativo.
+
+### 6.3. Validar a configuração Docker
+
+Antes de iniciar os serviços:
 
 ```bash
 docker compose config --quiet
+```
+
+Se não existirem erros de configuração, iniciar os containers:
+
+```bash
 docker compose up -d
+```
+
+Verificar o estado dos serviços:
+
+```bash
 docker compose ps
 ```
 
-The Compose file requires `POSTGRES_PASSWORD` from the local `.env` file and
-fails validation if it is missing. Keep `.env` local; `.env.example` contains
-only a placeholder.
+Aguardar até o PostgreSQL apresentar o estado saudável e o Kafka Connect estar disponível.
 
-PostgreSQL is exposed on `localhost:5432`, Kafka on `localhost:9092`, and the
-Debezium Connect REST API on `localhost:8083`. Wait for PostgreSQL to report
-healthy and for the Connect API to respond before registering the connector.
+### 6.4. Portas utilizadas
 
-To check the API:
+| Serviço | Porta local |
+|---|---:|
+| PostgreSQL | 5432 |
+| Apache Kafka | 9092 |
+| Debezium Connect REST API | 8083 |
+
+A API REST do Kafka Connect pode ser testada através de:
 
 ```bash
 curl http://localhost:8083/
 ```
 
-The Compose file uses a named volume for PostgreSQL data. The initialization
-script runs only when PostgreSQL initializes an empty data directory.
+## 7. Configuração do PostgreSQL
 
-## PostgreSQL configuration
+O PostgreSQL está configurado para suportar replicação lógica através do parâmetro:
 
-The Compose service enables logical replication with `wal_level=logical`.
-`postgres/init.sql` creates the `accounts` and `payments` tables and inserts
-synthetic demo rows. It also sets `REPLICA IDENTITY FULL` on `public.payments`.
+```text
+wal_level=logical
+```
 
-As with the other initialization statements, this setting is applied only when
-PostgreSQL initializes an empty data directory. Existing volumes are not
-modified by changes to `init.sql`.
+O script `postgres/init.sql` é responsável pela inicialização da base de dados e pela criação das tabelas:
 
-## Debezium connector configuration
+- `accounts`
+- `payments`
 
-The `payments-connector` captures `public.payments` from the `payments_db`
-database using the `pgoutput` plugin. It uses the `payments` database user,
-publication `payments_publication`, replication slot `payments_slot`, and topic
-prefix `dbserver1`. The publication is configured for filtered tables.
+O script também insere registos sintéticos para permitir a realização dos testes.
 
-Register the connector with the Connect REST API. Replace the password
-placeholder locally with the `POSTGRES_PASSWORD` value from `.env`; do not
-commit the substituted value or include it in published logs:
+Na tabela `public.payments` é aplicada a seguinte configuração:
+
+```sql
+ALTER TABLE public.payments
+REPLICA IDENTITY FULL;
+```
+
+Esta configuração permite disponibilizar a imagem completa do registo anterior em eventos de atualização e eliminação.
+
+**Nota:** o script de inicialização é executado apenas quando o PostgreSQL inicializa um diretório de dados vazio. Alterações posteriores ao ficheiro `init.sql` não modificam automaticamente os volumes já existentes.
+
+## 8. Configuração do conector Debezium
+
+O conector PostgreSQL do Debezium é responsável por monitorizar as alterações na tabela `public.payments`.
+
+A configuração utiliza:
+
+| Parâmetro | Valor |
+|---|---|
+| Nome do conector | `payments-connector` |
+| Classe | `PostgresConnector` |
+| Base de dados | `payments_db` |
+| Utilizador | `payments` |
+| Tabela monitorizada | `public.payments` |
+| Plugin | `pgoutput` |
+| Replication Slot | `payments_slot` |
+| Publication | `payments_publication` |
+| Topic Prefix | `dbserver1` |
+
+### 8.1. Registar o conector
+
+O registo é efetuado através da API REST do Kafka Connect.
+
+O exemplo seguinte utiliza um placeholder para a password. Antes da execução, substituir `<LOCAL_POSTGRES_PASSWORD>` pelo valor local definido no `.env`.
+
+Não guardar a password substituída no repositório.
 
 ```bash
 curl --fail-with-body -X POST \
@@ -131,83 +248,173 @@ curl --fail-with-body -X POST \
   http://localhost:8083/connectors
 ```
 
-Check connector and task status:
+A configuração é armazenada pelo Kafka Connect nos seus tópicos internos.
+
+### 8.2. Verificar o estado do conector
 
 ```bash
 curl http://localhost:8083/connectors/payments-connector/status
 ```
 
-## Kafka topics
+O conector e a respetiva tarefa deverão apresentar o estado:
 
-| Topic | Purpose |
-| --- | --- |
-| `dbserver1.public.payments` | Debezium change events for `public.payments` |
-| `connect_configs` | Kafka Connect connector configuration storage |
-| `connect_offsets` | Kafka Connect source offsets |
-| `connect_statuses` | Kafka Connect status storage |
-| `__consumer_offsets` | Kafka consumer group offsets (Kafka internal) |
+```text
+RUNNING
+```
 
-List topics from the Kafka container:
+## 9. Tópicos Kafka
+
+O Debezium publica os eventos de alteração no tópico:
+
+```text
+dbserver1.public.payments
+```
+
+Este nome resulta da combinação do prefixo `dbserver1` com o esquema e a tabela monitorizada.
+
+O Kafka Connect também utiliza tópicos internos para armazenar configurações, offsets e estados.
+
+| Tópico | Finalidade |
+|---|---|
+| `dbserver1.public.payments` | Eventos CDC da tabela de pagamentos |
+| `connect_configs` | Configurações dos conectores |
+| `connect_offsets` | Posições de leitura e offsets |
+| `connect_statuses` | Estados dos conectores |
+| `__consumer_offsets` | Offsets dos grupos de consumidores Kafka |
+
+Para listar os tópicos:
 
 ```bash
-docker exec payments-kafka /opt/kafka/bin/kafka-topics.sh \
+docker exec payments-kafka \
+  /opt/kafka/bin/kafka-topics.sh \
   --bootstrap-server localhost:9092 \
   --list
 ```
 
-## CDC operations
+## 10. Captura e leitura dos eventos CDC
 
-Debezium uses the `op` field to identify the change:
-
-| Operation | `op` | Meaning |
-| --- | --- | --- |
-| Snapshot | `r` | A row read during the initial snapshot |
-| INSERT | `c` | A row was created |
-| UPDATE | `u` | A row was updated; `before` and `after` describe the change |
-| DELETE | `d` | A row was deleted; `after` is `null` |
-
-Consume events from the beginning with:
+Para consumir os eventos publicados pelo Debezium:
 
 ```bash
-docker exec payments-kafka /opt/kafka/bin/kafka-console-consumer.sh \
+docker exec payments-kafka \
+  /opt/kafka/bin/kafka-console-consumer.sh \
   --bootstrap-server localhost:9092 \
   --topic dbserver1.public.payments \
   --from-beginning
 ```
 
-## `REPLICA IDENTITY FULL`
+O Debezium disponibiliza um campo `op` que identifica o tipo de operação detetada.
 
-With PostgreSQL's default replica identity, delete events generally contain only
-the primary key in the `before` image. `REPLICA IDENTITY FULL` records the
-previous row values in the WAL, allowing Debezium to include the full `before`
-image for updates and deletes. This setting can increase WAL volume.
+### Operações suportadas
 
-The test database used this setting and confirmed that update and delete events
-contained all seven payment columns in `before`. New databases receive this
-setting from `postgres/init.sql`.
+| Operação | Código | Descrição |
+|---|---|---|
+| Snapshot | `r` | Registo lido durante a captura inicial |
+| INSERT | `c` | Novo registo inserido |
+| UPDATE | `u` | Registo atualizado |
+| DELETE | `d` | Registo eliminado |
 
-## Testing results
+Os eventos incluem informação sobre os dados anteriores (`before`) e posteriores (`after`), conforme o tipo de operação.
 
-The local functional test completed successfully:
+No caso de uma eliminação, o campo `after` apresenta valor `null`.
 
-- `docker compose config --quiet` passed with the local `.env` file.
-- PostgreSQL reported healthy; Kafka and Debezium were running.
-- The connector and its task reported `RUNNING`.
-- Snapshot (`r`), insert (`c`), update (`u`), and delete (`d`) events were
-  observed on `dbserver1.public.payments`.
-- A synthetic test payment was inserted, updated, and deleted. The update and
-  delete events included all seven columns in `before`.
-- The five original sample payments remained; the test payment was removed.
+## 11. REPLICA IDENTITY FULL
 
-## Security and publication notes
+Por defeito, o PostgreSQL pode disponibilizar apenas a chave primária no evento de eliminação, dependendo da configuração de identidade da réplica.
 
-- The Compose file reads the database password from local `.env`, which is
-  ignored by Git. `.env.example` contains only a placeholder. Do not use a
-  development password in production.
-- The active connector configuration includes a database password stored by
-  Kafka Connect in its internal configuration topic. Do not publish connector
-  configuration dumps or Kafka data.
-- The SQL seed rows use synthetic demo data. Never put real personal or payment
-  card data in this project; `card_number` should not contain real card numbers.
-- This directory is not currently a Git repository, so tracked-file status and
-  prior Git history could not be audited.
+A configuração:
+
+```sql
+ALTER TABLE public.payments
+REPLICA IDENTITY FULL;
+```
+
+permite registar no WAL os valores anteriores completos da linha.
+
+Esta configuração é especialmente relevante para o CDC porque permite ao Debezium disponibilizar a informação completa do registo anterior nos eventos de atualização e eliminação.
+
+Nos testes realizados, foi possível confirmar que os eventos UPDATE e DELETE continham as sete colunas da tabela `payments` no campo `before`.
+
+A utilização de `REPLICA IDENTITY FULL` pode aumentar o volume de informação armazenada no WAL.
+
+## 12. Testes e resultados
+
+A validação funcional da pipeline foi realizada num ambiente local com Docker Compose.
+
+### Resultados obtidos
+
+| Teste | Resultado |
+|---|---|
+| Validação do Docker Compose | Concluído |
+| Estado saudável do PostgreSQL | Confirmado |
+| Kafka em execução | Confirmado |
+| Debezium Connect em execução | Confirmado |
+| Registo do conector | Concluído |
+| Estado do conector | RUNNING |
+| Captura inicial (Snapshot) | Confirmada |
+| Evento INSERT | Confirmado |
+| Evento UPDATE | Confirmado |
+| Evento DELETE | Confirmado |
+| Imagem anterior completa (`before`) | Confirmada |
+
+### Validação dos dados
+
+Foi criado um pagamento sintético para testar as operações de inserção, atualização e eliminação.
+
+Os eventos foram observados no tópico:
+
+```text
+dbserver1.public.payments
+```
+
+Foi igualmente confirmado que os eventos UPDATE e DELETE disponibilizavam as sete colunas do registo anterior.
+
+Após os testes, o registo utilizado foi eliminado e os cinco pagamentos originais de demonstração permaneceram na base de dados.
+
+## 13. Segurança e boas práticas
+
+Este projeto utiliza dados exclusivamente sintéticos e destina-se a um ambiente local de aprendizagem.
+
+Foram consideradas as seguintes práticas:
+
+- Utilização de variáveis de ambiente para configurar a password da base de dados.
+- Exclusão do ficheiro `.env` através do `.gitignore`.
+- Disponibilização de um `.env.example` sem credenciais reais.
+- Utilização de dados fictícios nos registos de demonstração.
+- Não utilização de números de cartões de pagamento reais.
+- Não publicação de configurações completas do conector que contenham credenciais.
+- Não publicação de dumps dos tópicos internos do Kafka.
+
+A configuração do conector pode armazenar a password da base de dados nos tópicos internos do Kafka Connect. Por esse motivo, os dados e configurações internos não devem ser partilhados indiscriminadamente.
+
+Esta implementação não inclui, por si só, todos os mecanismos de segurança necessários para um ambiente de produção.
+
+## 14. Possíveis evoluções do projeto
+
+A arquitetura atual constitui uma base para futuras experiências na área de Engenharia de Dados e processamento de eventos.
+
+Algumas evoluções possíveis incluem:
+
+- Automatizar o registo do conector Debezium através de um ficheiro de configuração.
+- Implementar consumidores Kafka para processar os eventos.
+- Integrar Apache Flink para processamento de dados em fluxo.
+- Desenvolver mecanismos de validação e transformação dos eventos.
+- Implementar monitorização dos serviços e da pipeline.
+- Adicionar testes automatizados.
+- Melhorar a gestão de configurações e credenciais.
+
+## 15. Objetivo de aprendizagem
+
+Este projeto foi desenvolvido como exercício prático para explorar conceitos de integração de dados, replicação lógica e arquiteturas orientadas a eventos.
+
+A implementação permitiu experimentar a comunicação entre diferentes tecnologias, compreender o funcionamento do Change Data Capture e observar como as alterações efetuadas numa base de dados podem ser transmitidas para uma plataforma de streaming.
+
+---
+
+## Autor
+
+**Alda Benta**
+
+Projeto desenvolvido para fins de aprendizagem e demonstração técnica na área de Engenharia de Dados.
+
+**Repositório:** [pipeline-pagamentos](https://github.com/am2989/pipeline-pagamentos)
