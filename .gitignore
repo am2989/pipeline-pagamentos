@@ -1,0 +1,17 @@
+# Local credentials: keep .env ignored; only the placeholder template is tracked
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+
+# Local database data and logs
+postgres-data/
+pgdata/
+*.log
+
+# Editor and operating-system files
+.vscode/
+.DS_Store
+Thumbs.db
